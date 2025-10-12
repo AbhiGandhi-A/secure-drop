@@ -54,18 +54,18 @@ export default function Profile() {
               plan,
             })
 
-            // 💡 FIX APPLIED HERE: Use the data returned from the server to update the user state.
+            // 💡 FIX APPLIED HERE: Use the complete user object from the server's response
             const updatedUser = confirm.data.user
             setUser({ 
                 id: updatedUser._id,
                 name: updatedUser.name,
                 email: updatedUser.email,
-                plan: updatedUser.subscriptionPlan // This will be "PREMIUM_MONTHLY" or "PREMIUM_YEARLY"
+                plan: updatedUser.subscriptionPlan // This value is now correct
             })
             
             notify("Subscription activated!", "success")
           } catch {
-            notify("Payment verification failed", "error")
+            notify("Payment verification failed", "error") // The error you are seeing now
           }
         },
         modal: {
@@ -78,7 +78,7 @@ export default function Profile() {
       const rzp = new window.Razorpay(options)
       rzp.open()
     } catch (e) {
-      notify("Billing not configured", "error")
+      notify("Failed to start payment process", "error") // Changed to be more descriptive
     }
   }
 
@@ -94,7 +94,6 @@ export default function Profile() {
         <strong>Email:</strong> {user.email}
       </div>
       <div>
-        {/* The plan name for display will now correctly come from the database value */}
         <strong>Plan:</strong> {user.plan || "FREE"} 
       </div>
 

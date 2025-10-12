@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     subscriptionPlan: {
       type: String,
-      enum: ["FREE", "PREMIUM_MONTHLY", "PREMIUM_YEARLY"],
+      enum: ["FREE", "PREMIUM_MONTHLY", "PREMIUM_YEARLY"], // Case-sensitive enum values
       default: "FREE",
     },
   },

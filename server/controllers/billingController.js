@@ -2,11 +2,10 @@
 
 const { razorpay: razorEnv } = require("../config/env")
 const crypto = require("crypto")
-const User = require("../models/User") // Ensure this path is correct
+const User = require("../models/User")
 
 let razorpay = null
 try {
-  // Check if Razorpay keys are configured before attempting to load the library
   if (razorEnv.keyId && razorEnv.keySecret) {
     const Razorpay = require("razorpay")
     razorpay = new Razorpay({ key_id: razorEnv.keyId, key_secret: razorEnv.keySecret })
@@ -21,7 +20,6 @@ async function createOrder(req, res) {
     if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
 
     const { plan = "monthly" } = req.body
-    // Assuming razorEnv.priceYearly and razorEnv.priceMonthly are in paise
     const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
     if (!amount) return res.status(400).json({ error: "Price not configured for this plan" })
 
@@ -60,32 +58,30 @@ async function confirmPayment(req, res) {
       .digest("hex")
 
     if (expected !== razorpay_signature) {
-      return res.status(400).json({ error: "Signature verification failed" })
+      // This is the error you reported - check razorEnv.keySecret
+      return res.status(400).json({ error: "Signature verification failed" }) 
     }
 
     // --- Successful Payment & User Update ---
     if (req.user?.id) {
-      // FIX: Use the correct, case-sensitive enum values from the UserSchema
-      // Schema enums are: "FREE", "PREMIUM_MONTHLY", "PREMIUM_YEARLY"
+      // 💡 FIX: Use the correct, case-sensitive enum values
       const newSubscriptionPlan = 
         plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY"
       
       const updatedUser = await User.findByIdAndUpdate(
         req.user.id,
-        { subscriptionPlan: newSubscriptionPlan }, // Corrected plan name
-        { new: true, select: "name email subscriptionPlan" } // return only required fields
+        { subscriptionPlan: newSubscriptionPlan }, 
+        { new: true, select: "name email subscriptionPlan" } 
       )
 
       if (!updatedUser) {
-         // This handles a successful payment but a user ID that doesn't exist
          return res.status(404).json({ error: "User not found to update plan" })
       }
       
-      // The updated user object returned here has the correct subscriptionPlan
+      // Return the updated user object with the correct plan name
       return res.json({ ok: true, user: updatedUser })
     }
 
-    // Fallback if req.user.id is missing despite successful auth middleware
     return res.status(400).json({ error: "Authenticated user ID missing" })
 
   } catch (e) {
