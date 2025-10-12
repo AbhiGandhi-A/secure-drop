@@ -6,10 +6,7 @@ let razorpay = null
 try {
   if (razorEnv.keyId && razorEnv.keySecret) {
     const Razorpay = require("razorpay")
-    razorpay = new Razorpay({
-      key_id: razorEnv.keyId,
-      key_secret: razorEnv.keySecret,
-    })
+    razorpay = new Razorpay({ key_id: razorEnv.keyId, key_secret: razorEnv.keySecret })
   }
 } catch (e) {
   console.warn("[billing] Razorpay init failed:", e.message)
@@ -18,8 +15,7 @@ try {
 // Create order
 async function createOrder(req, res) {
   try {
-    if (!razorpay)
-      return res.status(501).json({ error: "Billing not configured" })
+    if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
 
     const { plan = "monthly" } = req.body
     const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
@@ -46,49 +42,35 @@ async function createOrder(req, res) {
 }
 
 // Confirm payment
-// Confirm payment (final stable version)
 async function confirmPayment(req, res) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body;
-
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: "Missing payment fields" });
+      return res.status(400).json({ error: "Missing payment fields" })
     }
 
-    // Verify Razorpay signature
     const expected = crypto
       .createHmac("sha256", razorEnv.keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
+      .digest("hex")
 
     if (expected !== razorpay_signature) {
-      return res.status(400).json({ error: "Signature verification failed" });
+      return res.status(400).json({ error: "Signature verification failed" })
     }
 
-    // ✅ Use uppercase ENUM from schema
-    const newPlan = plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY";
-
-    // ✅ Re-fetch user from DB using ID in JWT
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    if (req.user?.id) {
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user.id,
+        { subscriptionPlan: plan === "yearly" ? "premium_yearly" : "premium" },
+        { new: true, select: "name email subscriptionPlan" } // return only required fields
+      )
+      return res.json({ ok: true, user: updatedUser })
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { subscriptionPlan: newPlan },
-      { new: true }
-    );
-
-    if (!updatedUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    console.log("✅ Subscription upgraded:", updatedUser.email, "->", updatedUser.subscriptionPlan);
-    return res.json({ ok: true, user: updatedUser });
+    return res.status(400).json({ error: "User not found" })
   } catch (e) {
-    console.error("[billing] confirmPayment error:", e);
-    return res.status(500).json({ error: "Payment verification failed" });
+    console.error("[billing] confirmPayment error:", e)
+    return res.status(500).json({ error: "Payment verification failed" })
   }
 }
 
