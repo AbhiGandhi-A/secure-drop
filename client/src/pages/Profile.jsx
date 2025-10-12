@@ -1,5 +1,3 @@
-// Profile.jsx
-
 "use client"
 
 import { useAuth } from "../context/AuthContext.jsx"
@@ -54,18 +52,11 @@ export default function Profile() {
               plan,
             })
 
-            // 💡 FIX APPLIED HERE: Use the complete user object from the server's response
-            const updatedUser = confirm.data.user
-            setUser({ 
-                id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                plan: updatedUser.subscriptionPlan // This value is now correct
-            })
-            
+            // Update user subscription plan immediately
+            setUser((prev) => prev ? { ...prev, plan: plan === "monthly" ? "Premium Monthly" : "Premium Yearly" } : prev)
             notify("Subscription activated!", "success")
           } catch {
-            notify("Payment verification failed", "error") // The error you are seeing now
+            notify("Payment verification failed", "error")
           }
         },
         modal: {
@@ -78,7 +69,7 @@ export default function Profile() {
       const rzp = new window.Razorpay(options)
       rzp.open()
     } catch (e) {
-      notify("Failed to start payment process", "error") // Changed to be more descriptive
+      notify("Billing not configured", "error")
     }
   }
 
@@ -94,7 +85,7 @@ export default function Profile() {
         <strong>Email:</strong> {user.email}
       </div>
       <div>
-        <strong>Plan:</strong> {user.plan || "FREE"} 
+        <strong>Plan:</strong> {user.plan || "FREE"}
       </div>
 
       <h3>Upgrade</h3>

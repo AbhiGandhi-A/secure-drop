@@ -1,5 +1,3 @@
-// billingController.js
-
 const { razorpay: razorEnv } = require("../config/env")
 const crypto = require("crypto")
 const User = require("../models/User")
@@ -21,7 +19,7 @@ async function createOrder(req, res) {
 
     const { plan = "monthly" } = req.body
     const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
-    if (!amount) return res.status(400).json({ error: "Price not configured for this plan" })
+    if (!amount) return res.status(400).json({ error: "Price not configured" })
 
     const order = await razorpay.orders.create({
       amount, // in paise
@@ -51,39 +49,25 @@ async function confirmPayment(req, res) {
       return res.status(400).json({ error: "Missing payment fields" })
     }
 
-    // --- Signature Verification ---
     const expected = crypto
       .createHmac("sha256", razorEnv.keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex")
 
     if (expected !== razorpay_signature) {
-      // This is the error you reported - check razorEnv.keySecret
-      return res.status(400).json({ error: "Signature verification failed" }) 
+      return res.status(400).json({ error: "Signature verification failed" })
     }
 
-    // --- Successful Payment & User Update ---
     if (req.user?.id) {
-      // 💡 FIX: Use the correct, case-sensitive enum values
-      const newSubscriptionPlan = 
-        plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY"
-      
       const updatedUser = await User.findByIdAndUpdate(
         req.user.id,
-        { subscriptionPlan: newSubscriptionPlan }, 
-        { new: true, select: "name email subscriptionPlan" } 
+        { subscriptionPlan: plan === "yearly" ? "premium_yearly" : "premium" },
+        { new: true, select: "name email subscriptionPlan" } // return only required fields
       )
-
-      if (!updatedUser) {
-         return res.status(404).json({ error: "User not found to update plan" })
-      }
-      
-      // Return the updated user object with the correct plan name
       return res.json({ ok: true, user: updatedUser })
     }
 
-    return res.status(400).json({ error: "Authenticated user ID missing" })
-
+    return res.status(400).json({ error: "User not found" })
   } catch (e) {
     console.error("[billing] confirmPayment error:", e)
     return res.status(500).json({ error: "Payment verification failed" })
