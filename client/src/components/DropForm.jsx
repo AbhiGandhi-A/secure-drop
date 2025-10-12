@@ -15,19 +15,27 @@ export default function DropForm() {
   const [result, setResult] = useState(null)
   const { user } = useAuth()
 
-  const plan = user?.plan || "ANON"
-  const maxByPlan = plan === "PREMIUM" ? 168 : plan === "FREE" ? 24 : 6
+  // Determine plan type (ANON if not logged in)
+  const plan = user ? user.subscriptionPlan || "FREE" : "ANON"
+
+  // Set expiry limit based on plan
+  const maxByPlan =
+    plan === "PREMIUM" ? 168 : plan === "FREE" ? 24 : 6
 
   const onSubmit = async (e) => {
     e.preventDefault()
+
     const fd = new FormData()
     fd.append("message", message)
     fd.append("expiresInHours", expiresInHours)
     fd.append("maxDownloads", oneTime ? 1 : maxDownloads)
     fd.append("oneTime", oneTime ? "true" : "false")
     if (file) fd.append("file", file)
+
     try {
-      const { data } = await api.post("/api/drops/create", fd, { headers: { "Content-Type": "multipart/form-data" } })
+      const { data } = await api.post("/api/drops/create", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
       setResult(data)
       notify("PIN generated. Copy it and share securely.", "success")
     } catch (e) {
@@ -52,8 +60,13 @@ export default function DropForm() {
           rows={4}
           placeholder="Write your message..."
         />
+
         <label>File (optional)</label>
-        <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+        />
+
         <div className="row">
           <div>
             <label>Expires (hours)</label>
@@ -62,10 +75,21 @@ export default function DropForm() {
               min="1"
               max={maxByPlan}
               value={Math.min(expiresInHours, maxByPlan)}
-              onChange={(e) => setExpires(Math.min(Number(e.target.value || 1), maxByPlan))}
+              onChange={(e) =>
+                setExpires(Math.min(Number(e.target.value || 1), maxByPlan))
+              }
             />
-            <div className="muted">Max for your plan: {maxByPlan}h</div>
+            <div className="muted">
+              Max for your plan: {maxByPlan} hours (
+              {plan === "ANON"
+                ? "Guest (6h)"
+                : plan === "FREE"
+                ? "Free (24h)"
+                : "Premium (7 days)"}
+              )
+            </div>
           </div>
+
           <div>
             <label>Max downloads</label>
             <input
@@ -78,9 +102,16 @@ export default function DropForm() {
             />
           </div>
         </div>
+
         <label className="checkbox">
-          <input type="checkbox" checked={oneTime} onChange={(e) => setOneTime(e.target.checked)} /> One-time download
+          <input
+            type="checkbox"
+            checked={oneTime}
+            onChange={(e) => setOneTime(e.target.checked)}
+          />{" "}
+          One-time download
         </label>
+
         <button className="btn-primary" type="submit">
           Send
         </button>
