@@ -12,18 +12,17 @@ try {
   console.warn("[billing] Razorpay init failed:", e.message)
 }
 
-// Create an order
-async function createOrder(req, res, next) {
+// Create order
+async function createOrder(req, res) {
   try {
     if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
 
-    const { plan = "monthly", amount } = req.body
-
-    const finalAmount = amount || (plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly)
-    if (!finalAmount) return res.status(400).json({ error: "Price not configured" })
+    const { plan = "monthly" } = req.body
+    const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
+    if (!amount) return res.status(400).json({ error: "Price not configured" })
 
     const order = await razorpay.orders.create({
-      amount: finalAmount, // in paise
+      amount, // in paise
       currency: "INR",
       receipt: `sub_${req.user?.id || "anon"}_${Date.now()}`,
       notes: { plan },
@@ -43,7 +42,7 @@ async function createOrder(req, res, next) {
 }
 
 // Confirm payment
-async function confirmPayment(req, res, next) {
+async function confirmPayment(req, res) {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -60,10 +59,15 @@ async function confirmPayment(req, res, next) {
     }
 
     if (req.user?.id) {
-      await User.findByIdAndUpdate(req.user.id, { subscriptionPlan: "premium" })
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user.id,
+        { subscriptionPlan: plan === "yearly" ? "premium_yearly" : "premium" },
+        { new: true, select: "name email subscriptionPlan" } // return only required fields
+      )
+      return res.json({ ok: true, user: updatedUser })
     }
 
-    return res.json({ ok: true, plan })
+    return res.status(400).json({ error: "User not found" })
   } catch (e) {
     console.error("[billing] confirmPayment error:", e)
     return res.status(500).json({ error: "Payment verification failed" })

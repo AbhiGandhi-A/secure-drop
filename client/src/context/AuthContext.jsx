@@ -20,18 +20,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setAuthToken(token)
     if (!token) setUser(null)
-    try {
-      if (token) {
-        const raw = localStorage.getItem("auth")
-        const hasAuth = !!raw
-        if (!hasAuth) {
-          const uRaw = localStorage.getItem("user")
-          const u = uRaw ? JSON.parse(uRaw) : null
-          const expiresAt = (Number(localStorage.getItem("loginAt") || 0) || Date.now()) + 60 * 60 * 1000
-          localStorage.setItem("auth", JSON.stringify({ token, user: u, expiresAt }))
-        }
-      }
-    } catch {}
+
     let timer
     if (token && loginAt) {
       const elapsed = Date.now() - loginAt
@@ -55,8 +44,6 @@ export function AuthProvider({ children }) {
     localStorage.setItem("token", data.token)
     localStorage.setItem("loginAt", String(Date.now()))
     localStorage.setItem("user", JSON.stringify(data.user))
-    const expiresAt = Date.now() + 60 * 60 * 1000
-    localStorage.setItem("auth", JSON.stringify({ token: data.token, user: data.user, expiresAt }))
     setToken(data.token)
     setLoginAt(Date.now())
     setUser(data.user)
@@ -67,8 +54,6 @@ export function AuthProvider({ children }) {
     localStorage.setItem("token", data.token)
     localStorage.setItem("loginAt", String(Date.now()))
     localStorage.setItem("user", JSON.stringify(data.user))
-    const expiresAt = Date.now() + 60 * 60 * 1000
-    localStorage.setItem("auth", JSON.stringify({ token: data.token, user: data.user, expiresAt }))
     setToken(data.token)
     setLoginAt(Date.now())
     setUser(data.user)
@@ -78,13 +63,16 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token")
     localStorage.removeItem("loginAt")
     localStorage.removeItem("user")
-    localStorage.removeItem("auth")
     setToken(null)
     setLoginAt(0)
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, token, login, register, logout }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, setUser, token, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

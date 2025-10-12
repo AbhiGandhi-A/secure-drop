@@ -1,4 +1,5 @@
 "use client"
+
 import { useAuth } from "../context/AuthContext.jsx"
 import api from "../api/client.js"
 import { notify } from "../components/Notifications.jsx"
@@ -15,7 +16,7 @@ function loadRazorpay() {
 }
 
 export default function Profile() {
-  const { user } = useAuth()
+  const { user, setUser } = useAuth()
 
   const subscribe = async (plan) => {
     try {
@@ -24,8 +25,10 @@ export default function Profile() {
         notify("Failed to load Razorpay", "error")
         return
       }
+
       const { data } = await api.post("/api/billing/create-order", { plan })
       const { keyId, orderId, amount, currency } = data || {}
+
       if (!keyId || !orderId) {
         notify("Billing not configured", "error")
         return
@@ -42,14 +45,16 @@ export default function Profile() {
         theme: { color: "#0ea5e9" },
         handler: async (response) => {
           try {
-            await api.post("/api/billing/confirm", {
+            const confirm = await api.post("/api/billing/confirm", {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               plan,
             })
+
+            // Update user subscription plan immediately
+            setUser((prev) => prev ? { ...prev, plan: plan === "monthly" ? "Premium Monthly" : "Premium Yearly" } : prev)
             notify("Subscription activated!", "success")
-            window.location.reload()
           } catch {
             notify("Payment verification failed", "error")
           }
@@ -80,7 +85,7 @@ export default function Profile() {
         <strong>Email:</strong> {user.email}
       </div>
       <div>
-        <strong>Plan:</strong> {user.plan}
+        <strong>Plan:</strong> {user.plan || "FREE"}
       </div>
 
       <h3>Upgrade</h3>
