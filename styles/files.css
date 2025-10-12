@@ -1,4 +1,4 @@
-/* basic styling for files/folders; mobile-first, clean neutrals + blue accent */
+/* basic styling for files/folders; mobile-first, clean neutrals + blue accent
 :root {
   --brand: #0b6ef3;
   --ink: #111418;
@@ -82,4 +82,4 @@
 .label {
   font-size: 14px;
   color: var(--muted);
-}
+} */
