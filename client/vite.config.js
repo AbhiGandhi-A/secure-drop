@@ -5,9 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: 'dist', // This is important for Vercel to find your built files
+    outDir: 'dist', // Output folder for Vercel
   },
   server: {
-    port: 5173
-  }
+    port: 5173,
+  },
 })
