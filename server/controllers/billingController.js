@@ -6,7 +6,10 @@ let razorpay = null
 try {
   if (razorEnv.keyId && razorEnv.keySecret) {
     const Razorpay = require("razorpay")
-    razorpay = new Razorpay({ key_id: razorEnv.keyId, key_secret: razorEnv.keySecret })
+    razorpay = new Razorpay({
+      key_id: razorEnv.keyId,
+      key_secret: razorEnv.keySecret,
+    })
   }
 } catch (e) {
   console.warn("[billing] Razorpay init failed:", e.message)
@@ -15,7 +18,8 @@ try {
 // Create order
 async function createOrder(req, res) {
   try {
-    if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
+    if (!razorpay)
+      return res.status(501).json({ error: "Billing not configured" })
 
     const { plan = "monthly" } = req.body
     const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
@@ -44,7 +48,13 @@ async function createOrder(req, res) {
 // Confirm payment
 async function confirmPayment(req, res) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      plan = "monthly",
+    } = req.body
+
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing payment fields" })
     }
@@ -58,16 +68,29 @@ async function confirmPayment(req, res) {
       return res.status(400).json({ error: "Signature verification failed" })
     }
 
-    if (req.user?.id) {
-      const updatedUser = await User.findByIdAndUpdate(
-        req.user.id,
-        { subscriptionPlan: plan === "yearly" ? "premium_yearly" : "premium" },
-        { new: true, select: "name email subscriptionPlan" } // return only required fields
-      )
-      return res.json({ ok: true, user: updatedUser })
+    if (!req.user?.id) {
+      return res.status(400).json({ error: "User not authenticated" })
     }
 
-    return res.status(400).json({ error: "User not found" })
+    // ✅ Correct plan mapping (matches schema)
+    const newPlan =
+      plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY"
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { subscriptionPlan: newPlan },
+      { new: true, select: "name email subscriptionPlan" }
+    )
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" })
+    }
+
+    return res.json({
+      ok: true,
+      message: "Subscription activated successfully",
+      user: updatedUser,
+    })
   } catch (e) {
     console.error("[billing] confirmPayment error:", e)
     return res.status(500).json({ error: "Payment verification failed" })
