@@ -1,11 +1,14 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-// ✅ important: base must be "/"
 export default defineConfig({
   plugins: [react()],
-  base: "/",  // this fixes broken asset URLs on Vercel
+  base: "./", // ✅ critical for correct asset path
   build: {
-    outDir: "dist"
-  }
-})
+    outDir: "dist",
+    assetsDir: "assets", // ✅ ensures CSS & JS go inside assets/
+  },
+  server: {
+    port: 5173,
+  },
+});
