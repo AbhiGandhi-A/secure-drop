@@ -3,12 +3,9 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "./", // ✅ critical for correct asset path
+  base: "./", // ✅ relative paths for CSS/JS
   build: {
     outDir: "dist",
-    assetsDir: "assets", // ✅ ensures CSS & JS go inside assets/
-  },
-  server: {
-    port: 5173,
+    assetsDir: "assets", 
   },
 });
