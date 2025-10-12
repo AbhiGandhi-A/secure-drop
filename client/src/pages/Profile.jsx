@@ -1,3 +1,5 @@
+// Profile.jsx
+
 "use client"
 
 import { useAuth } from "../context/AuthContext.jsx"
@@ -52,8 +54,15 @@ export default function Profile() {
               plan,
             })
 
-            // Update user subscription plan immediately
-            setUser((prev) => prev ? { ...prev, plan: plan === "monthly" ? "Premium Monthly" : "Premium Yearly" } : prev)
+            // 💡 FIX APPLIED HERE: Use the data returned from the server to update the user state.
+            const updatedUser = confirm.data.user
+            setUser({ 
+                id: updatedUser._id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                plan: updatedUser.subscriptionPlan // This will be "PREMIUM_MONTHLY" or "PREMIUM_YEARLY"
+            })
+            
             notify("Subscription activated!", "success")
           } catch {
             notify("Payment verification failed", "error")
@@ -85,7 +94,8 @@ export default function Profile() {
         <strong>Email:</strong> {user.email}
       </div>
       <div>
-        <strong>Plan:</strong> {user.plan || "FREE"}
+        {/* The plan name for display will now correctly come from the database value */}
+        <strong>Plan:</strong> {user.plan || "FREE"} 
       </div>
 
       <h3>Upgrade</h3>

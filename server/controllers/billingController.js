@@ -65,7 +65,7 @@ async function confirmPayment(req, res) {
 
     // --- Successful Payment & User Update ---
     if (req.user?.id) {
-      // 💡 FIX: Use the correct, case-sensitive enum values from the UserSchema
+      // FIX: Use the correct, case-sensitive enum values from the UserSchema
       // Schema enums are: "FREE", "PREMIUM_MONTHLY", "PREMIUM_YEARLY"
       const newSubscriptionPlan = 
         plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY"
@@ -81,6 +81,7 @@ async function confirmPayment(req, res) {
          return res.status(404).json({ error: "User not found to update plan" })
       }
       
+      // The updated user object returned here has the correct subscriptionPlan
       return res.json({ ok: true, user: updatedUser })
     }
 
