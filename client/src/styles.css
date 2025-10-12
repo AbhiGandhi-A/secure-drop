@@ -5,11 +5,16 @@
   --panel: #10161d;
   --panel-2: #0e141a;
   --text: #e6edf3;
-  --muted: #94a3b8;
+  --muted: #94a3b8; /* dark muted */
   --primary: #2dd4bf; /* teal */
   --accent: #38bdf8; /* light blue */
   --danger: #ef4444;
   --radius: 10px;
+
+  /* New variables added from light theme context */
+  --brand: #0b6ef3;
+  --ink: #111418;
+  --border: #e5e7eb;
 }
 
 * {
@@ -306,6 +311,83 @@ a:hover {
   margin: 8px 0;
   background: #0b1218;
 }
+/* Note: Standalone .title exists in original snippet, so adding .card .title */
 .title {
   font-weight: 600;
+}
+
+/* --- Added unique classes from the second snippet (files context) --- */
+
+.files-wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--brand);
+  color: white;
+  border-color: var(--brand);
+}
+.input-text {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 220px;
+}
+.input-file {
+  padding: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Note: .card selector skipped as it exists in the first snippet */
+.card .title {
+  font-weight: 600;
+  /* Original style used white color, assuming new variables: color: white; */
+  /* Re-using var(--text) for better dark/light theme blending, or maybe var(--ink) if used in a light card */
+  color: var(--text);
+}
+.card .meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.folder-upload {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.label {
+  font-size: 14px;
+  color: var(--muted);
 }
