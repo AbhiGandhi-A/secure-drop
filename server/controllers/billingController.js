@@ -46,54 +46,44 @@ async function createOrder(req, res) {
 }
 
 // Confirm payment
+// Confirm payment
 async function confirmPayment(req, res) {
   try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      plan = "monthly",
-    } = req.body
-
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: "Missing payment fields" })
+      return res.status(400).json({ error: "Missing payment fields" });
     }
 
     const expected = crypto
       .createHmac("sha256", razorEnv.keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex")
+      .digest("hex");
 
     if (expected !== razorpay_signature) {
-      return res.status(400).json({ error: "Signature verification failed" })
+      return res.status(400).json({ error: "Signature verification failed" });
     }
 
-    if (!req.user?.id) {
-      return res.status(400).json({ error: "User not authenticated" })
+    // ✅ FIX HERE: use uppercase ENUM values from schema
+    let newPlan = "FREE";
+    if (plan === "yearly") newPlan = "PREMIUM_YEARLY";
+    else if (plan === "monthly") newPlan = "PREMIUM_MONTHLY";
+
+    if (req.user?.id) {
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user.id,
+        { subscriptionPlan: newPlan },
+        { new: true, select: "name email subscriptionPlan" }
+      );
+
+      console.log("✅ Payment confirmed and plan updated:", updatedUser.subscriptionPlan);
+
+      return res.json({ ok: true, user: updatedUser });
     }
 
-    // ✅ Correct plan mapping (matches schema)
-    const newPlan =
-      plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY"
-
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      { subscriptionPlan: newPlan },
-      { new: true, select: "name email subscriptionPlan" }
-    )
-
-    if (!updatedUser) {
-      return res.status(404).json({ error: "User not found" })
-    }
-
-    return res.json({
-      ok: true,
-      message: "Subscription activated successfully",
-      user: updatedUser,
-    })
+    return res.status(400).json({ error: "User not found" });
   } catch (e) {
-    console.error("[billing] confirmPayment error:", e)
-    return res.status(500).json({ error: "Payment verification failed" })
+    console.error("[billing] confirmPayment error:", e);
+    return res.status(500).json({ error: "Payment verification failed" });
   }
 }
 
