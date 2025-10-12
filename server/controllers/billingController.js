@@ -12,16 +12,18 @@ try {
   console.warn("[billing] Razorpay init failed:", e.message)
 }
 
-// Create an order the client will use to open Razorpay Checkout
+// Create an order
 async function createOrder(req, res, next) {
   try {
     if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
-    const { plan = "monthly" } = req.body
-    const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
-    if (!amount) return res.status(400).json({ error: "Price not configured" })
+
+    const { plan = "monthly", amount } = req.body
+
+    const finalAmount = amount || (plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly)
+    if (!finalAmount) return res.status(400).json({ error: "Price not configured" })
 
     const order = await razorpay.orders.create({
-      amount, // in paise
+      amount: finalAmount, // in paise
       currency: "INR",
       receipt: `sub_${req.user?.id || "anon"}_${Date.now()}`,
       notes: { plan },
@@ -35,14 +37,15 @@ async function createOrder(req, res, next) {
       plan,
     })
   } catch (e) {
-    next(e)
+    console.error("[billing] createOrder error:", e)
+    return res.status(500).json({ error: "Failed to create order" })
   }
 }
 
-// Verify payment signature from client and upgrade user
+// Confirm payment
 async function confirmPayment(req, res, next) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body || {}
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing payment fields" })
     }
@@ -56,14 +59,14 @@ async function confirmPayment(req, res, next) {
       return res.status(400).json({ error: "Signature verification failed" })
     }
 
-    // Mark user as premium; you can also persist plan and renewal date
     if (req.user?.id) {
       await User.findByIdAndUpdate(req.user.id, { subscriptionPlan: "premium" })
     }
 
     return res.json({ ok: true, plan })
   } catch (e) {
-    next(e)
+    console.error("[billing] confirmPayment error:", e)
+    return res.status(500).json({ error: "Payment verification failed" })
   }
 }
 
