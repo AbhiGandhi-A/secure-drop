@@ -13,7 +13,7 @@ const { notFound, errorHandler } = require("./middleware/errorHandler")
 const { startExpiryWorker } = require("./cron/expiryWorker")
 
 const app = express()
-
+app.set("trust proxy", 1); 
 app.use(helmet())
 app.use(cors({ origin: corsOrigin === "*" ? true : corsOrigin, credentials: true }))
 app.use(compression())
