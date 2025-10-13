@@ -1,6 +1,5 @@
 "use client"
-
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import api from "../api/client.js"
 import { notify } from "./Notifications.jsx"
 import AdSlot from "./AdSlot.jsx"
@@ -13,21 +12,31 @@ export default function DropForm() {
   const [maxDownloads, setMax] = useState(1)
   const [oneTime, setOneTime] = useState(false)
   const [result, setResult] = useState(null)
+
   const { user } = useAuth()
-
   // Determine plan type (ANON if not logged in)
-  const plan = user ? user.subscriptionPlan || "FREE" : "ANON"
+  const plan = user ? user.plan || "FREE" : "ANON"
 
-  // Set expiry limit based on plan
-  const maxByPlan =
-    plan === "PREMIUM" ? 168 : plan === "FREE" ? 24 : 6
+  // Plan-based limits (mirror backend env defaults)
+  const maxByPlan = useMemo(() => {
+    if (plan === "PREMIUM_YEARLY") return 336 // 2 weeks
+    if (plan === "PREMIUM_MONTHLY") return 168 // 1 week
+    if (plan === "FREE") return 24
+    return 6 // ANON
+  }, [plan])
+
+  const maxDownloadsHint = useMemo(() => {
+    if (plan === "PREMIUM_YEARLY") return "Unlimited"
+    if (plan === "PREMIUM_MONTHLY") return "20"
+    if (plan === "FREE") return "5"
+    return "3" // ANON
+  }, [plan])
 
   const onSubmit = async (e) => {
     e.preventDefault()
-
     const fd = new FormData()
     fd.append("message", message)
-    fd.append("expiresInHours", expiresInHours)
+    fd.append("expiresInHours", Math.min(expiresInHours, maxByPlan))
     fd.append("maxDownloads", oneTime ? 1 : maxDownloads)
     fd.append("oneTime", oneTime ? "true" : "false")
     if (file) fd.append("file", file)
@@ -62,10 +71,7 @@ export default function DropForm() {
         />
 
         <label>File (optional)</label>
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-        />
+        <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
 
         <div className="row">
           <div>
@@ -75,17 +81,17 @@ export default function DropForm() {
               min="1"
               max={maxByPlan}
               value={Math.min(expiresInHours, maxByPlan)}
-              onChange={(e) =>
-                setExpires(Math.min(Number(e.target.value || 1), maxByPlan))
-              }
+              onChange={(e) => setExpires(Math.min(Number(e.target.value || 1), maxByPlan))}
             />
             <div className="muted">
               Max for your plan: {maxByPlan} hours (
               {plan === "ANON"
                 ? "Guest (6h)"
                 : plan === "FREE"
-                ? "Free (24h)"
-                : "Premium (7 days)"}
+                  ? "Free (24h)"
+                  : plan === "PREMIUM_MONTHLY"
+                    ? "Premium Monthly (7 days)"
+                    : "Premium Yearly (14 days)"}
               )
             </div>
           </div>
@@ -96,20 +102,16 @@ export default function DropForm() {
               type="number"
               min="1"
               max="100"
-              disabled={oneTime}
-              value={maxDownloads}
-              onChange={(e) => setMax(e.target.value)}
+              disabled={oneTime || plan === "PREMIUM_YEARLY"} // unlimited on yearly
+              value={oneTime ? 1 : maxDownloads}
+              onChange={(e) => setMax(Number(e.target.value || 1))}
             />
+            <div className="muted">{plan === "PREMIUM_YEARLY" ? "Unlimited" : `Up to ${maxDownloadsHint}`}</div>
           </div>
         </div>
 
         <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={oneTime}
-            onChange={(e) => setOneTime(e.target.checked)}
-          />{" "}
-          One-time download
+          <input type="checkbox" checked={oneTime} onChange={(e) => setOneTime(e.target.checked)} /> One-time download
         </label>
 
         <button className="btn-primary" type="submit">
