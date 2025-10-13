@@ -16,9 +16,9 @@ function loadRazorpay() {
 }
 
 function formatPlan(plan) {
-  if (plan === "PREMIUM_MONTHLY") return "Premium Monthly"
-  if (plan === "PREMIUM_YEARLY") return "Premium Yearly"
-  return plan || "FREE"
+  if (plan === "PREMIUM_MONTHLY") return "Premium Monthly"
+  if (plan === "PREMIUM_YEARLY") return "Premium Yearly"
+  return plan || "FREE"
 }
 
 export default function Profile() {
@@ -58,13 +58,13 @@ export default function Profile() {
               plan,
             })
 
-            // 💡 FIX: Use the updated user object returned from the server
-            if (confirmData.ok && confirmData.user) {
+            // 💡 FIX: Use the updated user object returned from the server (confirmData.user)
+            if (confirmData.ok && confirmData.user) {
               setUser(confirmData.user) 
               notify("Subscription activated!", "success")
-            } else {
-              throw new Error("Payment verification failed on server")
-            }
+            } else {
+              throw new Error("Payment verification failed on server")
+            }
 
           } catch (error) {
             console.error("Payment handler error:", error)

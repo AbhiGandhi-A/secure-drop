@@ -12,7 +12,7 @@ try {
   console.warn("[billing] Razorpay init failed:", e.message)
 }
 
-// Create order (omitted for brevity, assume unchanged)
+// Create order
 async function createOrder(req, res) {
   try {
     if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
@@ -64,20 +64,18 @@ async function confirmPayment(req, res) {
       const updatedUser = await User.findByIdAndUpdate(
         req.user.id,
         { subscriptionPlan: newPlan }, 
-        // NOTE: We must ensure the returned object structure is consistent with the client
         { 
           new: true, 
-          select: "name email subscriptionPlan _id" // Include _id for consistency
+          select: "name email subscriptionPlan _id" 
         } 
       )
 
-      // 💡 RESTRUCTURED RESPONSE to match client AuthContext expectations
-      // The user object structure should typically be { id, name, email, plan }
+      // 💡 RESPONSE: Return the updated user object with the 'plan' field set to subscriptionPlan
       const responseUser = {
         id: updatedUser._id.toString(),
         name: updatedUser.name,
         email: updatedUser.email,
-        plan: updatedUser.subscriptionPlan, // This is the updated plan
+        plan: updatedUser.subscriptionPlan, // Correctly set to "PREMIUM_MONTHLY" or "PREMIUM_YEARLY"
       }
       return res.json({ ok: true, user: responseUser })
     }
