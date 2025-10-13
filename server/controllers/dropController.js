@@ -13,13 +13,14 @@ const { scanFile } = require("../services/virusScan")
 
 function planFromReq(req) {
   if (!req.user) return "ANON"
-  // Assuming subscription plan names from previous context: PREMIUM_MONTHLY/YEARLY should map to "PREMIUM"
+  // Maps PREMIUM_MONTHLY/YEARLY to "PREMIUM" for limit checks
   if (req.user.plan.startsWith("PREMIUM")) return "PREMIUM" 
   return req.user.plan || "FREE"
 }
 
 function getMaxBytes(plan) {
-  if (plan === "PREMIUM") return limits.premiumMaxBytes
+  // These return the new limits defined in env.js
+  if (plan === "PREMIUM") return limits.premiumMaxBytes 
   if (plan === "FREE") return limits.freeMaxBytes
   return limits.anonMaxBytes
 }
@@ -39,7 +40,7 @@ async function createDrop(req, res, next) {
     }
 
     const plan = planFromReq(req)
-    const maxBytes = getMaxBytes(plan)
+    const maxBytes = getMaxBytes(plan) // Uses the updated limits
     const maxExpire = getMaxExpireHours(plan)
 
     const { message = "", expiresInHours = Math.min(24, maxExpire), maxDownloads = 1, oneTime = false } = req.body
@@ -54,13 +55,12 @@ async function createDrop(req, res, next) {
     if (req.file) {
       if (req.file.size > maxBytes) {
         fs.unlinkSync(req.file.path)
-        return res.status(400).json({ error: "File too large for your plan" })
+        return res.status(400).json({ error: `File too large. Max allowed: ${maxBytes / (1024 * 1024)} MB for your plan` })
       }
       
       mimeType = mime.lookup(req.file.originalname) || req.file.mimetype || "application/octet-stream"
       
-      // 🚨 FIX APPLIED: REMOVED the check against allowedMimeTypes, 
-      // allowing any file type to pass through.
+      // Removed check against allowedMimeTypes
       
       // Virus scan (optional)
       const scan = await scanFile(req.file.path)
