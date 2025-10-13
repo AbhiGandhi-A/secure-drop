@@ -12,7 +12,7 @@ try {
   console.warn("[billing] Razorpay init failed:", e.message)
 }
 
-// Create order
+// Create order (omitted for brevity, assume unchanged)
 async function createOrder(req, res) {
   try {
     if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
@@ -59,15 +59,27 @@ async function confirmPayment(req, res) {
     }
 
     if (req.user?.id) {
-      // 🚨 CORRECTION: Use the exact Mongoose Schema enum values
       const newPlan = plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY" 
 
       const updatedUser = await User.findByIdAndUpdate(
         req.user.id,
         { subscriptionPlan: newPlan }, 
-        { new: true, select: "name email subscriptionPlan" } 
+        // NOTE: We must ensure the returned object structure is consistent with the client
+        { 
+          new: true, 
+          select: "name email subscriptionPlan _id" // Include _id for consistency
+        } 
       )
-      return res.json({ ok: true, user: updatedUser })
+
+      // 💡 RESTRUCTURED RESPONSE to match client AuthContext expectations
+      // The user object structure should typically be { id, name, email, plan }
+      const responseUser = {
+        id: updatedUser._id.toString(),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        plan: updatedUser.subscriptionPlan, // This is the updated plan
+      }
+      return res.json({ ok: true, user: responseUser })
     }
 
     return res.status(400).json({ error: "User not found" })

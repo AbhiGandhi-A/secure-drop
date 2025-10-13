@@ -15,13 +15,11 @@ function loadRazorpay() {
   })
 }
 
-// 🚨 NEW HELPER: Translates internal DB plan names to display names
 function formatPlan(plan) {
   if (plan === "PREMIUM_MONTHLY") return "Premium Monthly"
   if (plan === "PREMIUM_YEARLY") return "Premium Yearly"
   return plan || "FREE"
 }
-
 
 export default function Profile() {
   const { user, setUser } = useAuth()
@@ -53,18 +51,23 @@ export default function Profile() {
         theme: { color: "#0ea5e9" },
         handler: async (response) => {
           try {
-            const confirm = await api.post("/api/billing/confirm", {
+            const { data: confirmData } = await api.post("/api/billing/confirm", {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               plan,
             })
 
-            // 🚨 FRONT-END PLAN UPDATE: Must match the internal plan code (PREMIUM_MONTHLY/YEARLY)
-            const newPlan = plan === "monthly" ? "PREMIUM_MONTHLY" : "PREMIUM_YEARLY"
-            setUser((prev) => prev ? { ...prev, plan: newPlan } : prev)
-            notify("Subscription activated!", "success")
-          } catch {
+            // 💡 FIX: Use the updated user object returned from the server
+            if (confirmData.ok && confirmData.user) {
+              setUser(confirmData.user) 
+              notify("Subscription activated!", "success")
+            } else {
+              throw new Error("Payment verification failed on server")
+            }
+
+          } catch (error) {
+            console.error("Payment handler error:", error)
             notify("Payment verification failed", "error")
           }
         },
@@ -94,7 +97,7 @@ export default function Profile() {
         <strong>Email:</strong> {user.email}
       </div>
       <div>
-        <strong>Plan:</strong> {formatPlan(user.plan)} {/* 🚨 Use helper function for display */}
+        <strong>Plan:</strong> {formatPlan(user.plan)}
       </div>
 
       <h3>Upgrade</h3>
