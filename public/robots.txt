@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://secure-drop-phi.vercel.app/sitemap.xml
