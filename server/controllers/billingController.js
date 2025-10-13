@@ -3,59 +3,34 @@ const crypto = require("crypto")
 const User = require("../models/User")
 
 let razorpay = null
-
-// 🚨 LOGGING AT SERVER STARTUP 🚨
-if (!razorEnv.keyId || !razorEnv.keySecret) {
-    console.error("[billing] FATAL: Razorpay environment variables (keyId/keySecret) are MISSING. Check ../config/env.")
-} else {
-    console.log(`[billing] Razorpay Key ID loaded (ID starts with: ${razorEnv.keyId.substring(0, 4)}...).`)
-}
-
 try {
   if (razorEnv.keyId && razorEnv.keySecret) {
-    // Ensure 'razorpay' package is installed on the server
     const Razorpay = require("razorpay")
     razorpay = new Razorpay({ key_id: razorEnv.keyId, key_secret: razorEnv.keySecret })
-    console.log("[billing] Razorpay instance initialized successfully.")
   }
 } catch (e) {
-  console.warn("[billing] Razorpay init failed during construction:", e.message)
+  console.warn("[billing] Razorpay init failed:", e.message)
 }
-
 
 // Create order
 async function createOrder(req, res) {
-    // 1. AUTHENTICATION CHECK (Requires 'authenticate' middleware on the route)
-    if (!req.user?.id) {
-        return res.status(401).json({ error: "Authentication required" })
-    }
-    
+    // 🚨 Ensure the user is authenticated early (requires authenticate middleware on route)
+    if (!req.user?.id) {
+        return res.status(401).json({ error: "Authentication required" })
+    }
+    
     try {
-      // 2. CONFIGURATION CHECK (Checks if Razorpay was initialized)
-      if (!razorpay) {
-            console.error("[billing] createOrder failed: Razorpay instance is NULL (Keys likely missing or Razorpay library failed to load).")
-            return res.status(501).json({ error: "Billing not configured" })
-        }
+      if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
 
       const { plan = "monthly" } = req.body
       const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
+      if (!amount) return res.status(400).json({ error: "Price not configured" })
 
-      // 3. PRICE CHECK (Checks if prices are configured)
-      if (!amount || amount <= 0) {
-            console.error(`[billing] createOrder failed: Price is invalid. plan=${plan}, amount=${amount}. Check razorEnv.priceMonthly/priceYearly.`)
-            return res.status(400).json({ error: "Price not configured" })
-        }
-
-      // Log the amount being used for the order
-      console.log(`[billing] Creating order for user ${req.user.id} (Plan: ${plan}, Amount: ${amount})`)
-
-
-      // 4. RAZORPAY API CALL
       const order = await razorpay.orders.create({
         amount, // in paise
         currency: "INR",
-        receipt: `sub_${req.user.id}_${Date.now()}`,
-        notes: { plan, userId: req.user.id },
+        receipt: `sub_${req.user.id}_${Date.now()}`, // Use req.user.id directly now
+        notes: { plan, userId: req.user.id }, // Best practice: explicitly pass userId
       })
 
       return res.json({
@@ -66,24 +41,25 @@ async function createOrder(req, res) {
         plan,
       })
     } catch (e) {
-      console.error("[billing] createOrder error (Razorpay API call failed):", e.message, e)
+      console.error("[billing] createOrder error:", e)
       return res.status(500).json({ error: "Failed to create order" })
     }
 }
 
-// Confirm payment (remains unchanged)
+// Confirm payment
 async function confirmPayment(req, res) {
-    // 🚨 Ensure the user is authenticated early
-    if (!req.user?.id) {
-        return res.status(401).json({ error: "Authentication required" }) 
-    }
-    
+    // 🚨 Ensure the user is authenticated early (requires authenticate middleware on route)
+    if (!req.user?.id) {
+        return res.status(401).json({ error: "Authentication required" }) // Better status code than 400
+    }
+    
     try {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return res.status(400).json({ error: "Missing payment fields" })
       }
     
+      // 🚨 DEBUG LOGGING FOR SIGNATURE FAILURE 🚨 (Confirmed OK by previous logs)
       console.log("--- Razorpay Signature Check Debug Info ---");
       console.log(`1. Secret Key used by server: ${razorEnv.keySecret ? 'Loaded' : 'NOT FOUND'}`);
       console.log(`2. Signature input string: ${razorpay_order_id}|${razorpay_payment_id}`);
@@ -102,6 +78,7 @@ async function confirmPayment(req, res) {
         return res.status(400).json({ error: "Signature verification failed" })
       }
     
+      // Log success before updating DB
       console.log("[billing] Signature verified successfully. Updating user plan.");
 
 
@@ -109,18 +86,18 @@ async function confirmPayment(req, res) {
       const newPlan = plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY" 
 
       const updatedUser = await User.findByIdAndUpdate(
-        req.user.id,
+        req.user.id, // ID is guaranteed here by the check at the function start
         { subscriptionPlan: newPlan }, 
         { 
           new: true, 
           select: "name email subscriptionPlan _id" 
         } 
       )
-      
-      if (!updatedUser) {
-          console.error(`[billing] User ID ${req.user.id} not found for update.`);
-          return res.status(404).json({ error: "User profile not found in database." });
-      }
+      
+      if (!updatedUser) {
+          console.error(`[billing] User ID ${req.user.id} not found for update.`);
+          return res.status(404).json({ error: "User profile not found in database." });
+      }
 
       const responseUser = {
         id: updatedUser._id.toString(),
@@ -136,5 +113,4 @@ async function confirmPayment(req, res) {
     }
 }
 
-// 🚨 THIS IS THE CRITICAL EXPORT LINE
 module.exports = { createOrder, confirmPayment }
