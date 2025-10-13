@@ -6,29 +6,39 @@ const mime = require("mime-types")
 const Drop = require("../models/Drop")
 const { generateHashedPIN, maskPIN } = require("../utils/pin")
 const { compareValue } = require("../utils/hash")
-const { allowedMimeTypes } = require("../config/constants") // NOTE: This constant is now unused
-const { limits, expiry, jwtSecret, uploadDir } = require("../config/env")
+const { allowedMimeTypes } = require("../config/constants")
+// 🚨 IMPORT maxDownloads from env
+const { limits, expiry, maxDownloads: dlLimits, jwtSecret, uploadDir } = require("../config/env")
 const storage = require("../utils/storage")
 const { scanFile } = require("../services/virusScan")
 
 function planFromReq(req) {
   if (!req.user) return "ANON"
-  // Maps PREMIUM_MONTHLY/YEARLY to "PREMIUM" for limit checks
-  if (req.user.plan.startsWith("PREMIUM")) return "PREMIUM" 
+  // Returns the exact plan string from the schema: FREE, PREMIUM_MONTHLY, or PREMIUM_YEARLY
   return req.user.plan || "FREE"
 }
 
 function getMaxBytes(plan) {
-  // These return the new limits defined in env.js
-  if (plan === "PREMIUM") return limits.premiumMaxBytes 
+  // All PREMIUM plans share the same max file size limit
+  if (plan.startsWith("PREMIUM")) return limits.premiumMaxBytes
   if (plan === "FREE") return limits.freeMaxBytes
   return limits.anonMaxBytes
 }
 
+// 🚨 UPDATED: Get max expiry based on full plan
 function getMaxExpireHours(plan) {
-  if (plan === "PREMIUM") return expiry.premiumMaxHours
-  if (plan === "FREE") return expiry.freeMaxHours
-  return expiry.anonMaxHours
+  if (plan === "PREMIUM_YEARLY") return expiry.premiumYearlyMaxHours // 2 weeks
+  if (plan === "PREMIUM_MONTHLY") return expiry.premiumMonthlyMaxHours // 1 week
+  if (plan === "FREE") return expiry.freeMaxHours // 24 hours
+  return expiry.anonMaxHours // 6 hours
+}
+
+// 🚨 NEW: Get max downloads based on full plan
+function getMaxDropDownloads(plan) {
+  if (plan === "PREMIUM_YEARLY") return dlLimits.yearly
+  if (plan === "PREMIUM_MONTHLY") return dlLimits.monthly
+  if (plan === "FREE") return dlLimits.free
+  return dlLimits.anon
 }
 
 async function createDrop(req, res, next) {
@@ -40,13 +50,23 @@ async function createDrop(req, res, next) {
     }
 
     const plan = planFromReq(req)
-    const maxBytes = getMaxBytes(plan) // Uses the updated limits
+    const maxBytes = getMaxBytes(plan)
     const maxExpire = getMaxExpireHours(plan)
+    const defaultMaxDownloads = getMaxDropDownloads(plan) // 🚨 Get default max downloads
 
-    const { message = "", expiresInHours = Math.min(24, maxExpire), maxDownloads = 1, oneTime = false } = req.body
+    const {
+      message = "",
+      expiresInHours = Math.min(24, maxExpire),
+      maxDownloads = defaultMaxDownloads, // 🚨 Use plan default here
+      oneTime = false
+    } = req.body
 
     const oneTimeBool = typeof oneTime === "string" ? oneTime.toLowerCase() === "true" : !!oneTime
-    const maxDownloadsNum = Math.min(Number.parseInt(maxDownloads, 10) || 1, 100)
+
+    // Max Downloads clamping: Cannot exceed plan's maximum or 100 for safety (if unlimited)
+    const requestedDownloads = Number.parseInt(maxDownloads, 10) || defaultMaxDownloads
+    // 🚨 Clamp the requested downloads to the lesser of the requested value, the plan limit, and 100
+    const maxDownloadsNum = Math.min(requestedDownloads, defaultMaxDownloads, 100)
 
     // File validations
     let filename = ""
@@ -57,11 +77,9 @@ async function createDrop(req, res, next) {
         fs.unlinkSync(req.file.path)
         return res.status(400).json({ error: `File too large. Max allowed: ${maxBytes / (1024 * 1024)} MB for your plan` })
       }
-      
+
       mimeType = mime.lookup(req.file.originalname) || req.file.mimetype || "application/octet-stream"
-      
-      // Removed check against allowedMimeTypes
-      
+
       // Virus scan (optional)
       const scan = await scanFile(req.file.path)
       if (!scan.clean) {
@@ -79,12 +97,13 @@ async function createDrop(req, res, next) {
 
     const drop = await Drop.create({
       tokenHash,
-      shortPIN: maskPIN(plain), // stored masked; optional
+      shortPIN: maskPIN(plain),
       uploaderId: req.user?.id || null,
       message,
       filename,
       mimeType,
       filePath,
+      // If oneTime is set, it overrides maxDownloads and sets it to 1
       maxDownloads: oneTimeBool ? 1 : maxDownloadsNum,
       downloadsCount: 0,
       oneTime: oneTimeBool,
@@ -92,13 +111,7 @@ async function createDrop(req, res, next) {
       expiresAt,
     })
 
-    res.json({
-      id: drop._id,
-      pin: plain, // Only returned once
-      expiresAt,
-      maxDownloads: drop.maxDownloads,
-      oneTime: drop.oneTime,
-    })
+    res.json({ id: drop._id, pin: plain, expiresAt, maxDownloads: drop.maxDownloads, oneTime: drop.oneTime })
   } catch (e) {
     next(e)
   }
@@ -112,8 +125,6 @@ async function viewDrop(req, res, next) {
       return res.status(400).json({ error: "Invalid PIN format" })
     }
 
-    // Previously limited to latest 1000 docs; remove that limit so the same PIN
-    // remains valid until its real expiry and download limits.
     const candidates = await Drop.find({}).sort({ createdAt: -1 })
 
     let matched = null
@@ -124,22 +135,11 @@ async function viewDrop(req, res, next) {
       }
     }
 
-    if (!matched) {
-      return res.status(404).json({ error: "Invalid PIN" })
-    }
+    if (!matched) return res.status(404).json({ error: "Invalid PIN" })
+    if (matched.expiresAt && matched.expiresAt <= new Date()) return res.status(410).json({ error: "Expired" })
+    if (matched.isDeleted) return res.status(410).json({ error: "Deleted or limit reached" })
+    if (Number(matched.downloadsCount || 0) >= Number(matched.maxDownloads || 1)) return res.status(410).json({ error: "Download limit reached" })
 
-    // Explicit checks for user-friendly messages
-    if (matched.expiresAt && matched.expiresAt <= new Date()) {
-      return res.status(410).json({ error: "Expired" })
-    }
-    if (matched.isDeleted) {
-      return res.status(410).json({ error: "Deleted or limit reached" })
-    }
-    if (Number(matched.downloadsCount || 0) >= Number(matched.maxDownloads || 1)) {
-      return res.status(410).json({ error: "Download limit reached" })
-    }
-
-    // Issue a short-lived download token if a file exists
     let downloadToken = null
     if (matched.filePath && matched.filename && !matched.isDeleted) {
       downloadToken = jwt.sign({ dropId: matched._id.toString() }, jwtSecret, { expiresIn: "5m" })
@@ -150,17 +150,12 @@ async function viewDrop(req, res, next) {
       message: matched.message || "",
       file: matched.filePath
         ? {
-            filename: matched.filename,
-            mimeType: matched.mimeType,
-            sizeBytes: (() => {
-              try {
-                return fs.statSync(matched.filePath).size
-              } catch {
-                return null
-              }
-            })(),
-          }
-        : null,
+          filename: matched.filename,
+          mimeType: matched.mimeType,
+          sizeBytes: (() => {
+            try { return fs.statSync(matched.filePath).size } catch { return null }
+          })(),
+        } : null,
       expiresAt: matched.expiresAt,
       remainingDownloads: Math.max(Number(matched.maxDownloads || 1) - Number(matched.downloadsCount || 0), 0),
       downloadToken,
@@ -186,10 +181,7 @@ async function downloadDrop(req, res, next) {
     if (!drop || drop.isDeleted) return res.status(404).json({ error: "Not found" })
     if (drop.expiresAt && drop.expiresAt <= new Date()) return res.status(410).json({ error: "Expired" })
     if (!drop.filePath) return res.status(400).json({ error: "No file for this drop" })
-
-    if (Number(drop.downloadsCount || 0) >= Number(drop.maxDownloads || 1)) {
-      return res.status(410).json({ error: "Download limit reached" })
-    }
+    if (Number(drop.downloadsCount || 0) >= Number(drop.maxDownloads || 1)) return res.status(410).json({ error: "Download limit reached" })
 
     const absPath = path.isAbsolute(drop.filePath) ? drop.filePath : path.resolve(process.cwd(), drop.filePath)
     if (!fs.existsSync(absPath)) return res.status(404).json({ error: "File missing" })
@@ -235,15 +227,11 @@ async function downloadDrop(req, res, next) {
       if (!res.headersSent) {
         res.status(404).json({ error: "File missing" })
       } else {
-        try {
-          res.end()
-        } catch {}
+        try { res.end() } catch { }
       }
     })
     stream.pipe(res)
-  } catch (e) {
-    next(e)
-  }
+  } catch (e) { next(e) }
 }
 
 async function deleteDrop(req, res, next) {
@@ -253,18 +241,14 @@ async function deleteDrop(req, res, next) {
     if (!drop) return res.status(404).json({ error: "Not found" })
 
     // Only owner can delete
-    if (!req.user || drop.uploaderId?.toString() !== req.user.id) {
-      return res.status(403).json({ error: "Forbidden" })
-    }
+    if (!req.user || drop.uploaderId?.toString() !== req.user.id) return res.status(403).json({ error: "Forbidden" })
 
     if (drop.filePath) await storage.removeFile(drop.filePath)
     drop.isDeleted = true
     drop.filePath = ""
     await drop.save()
     res.json({ ok: true })
-  } catch (e) {
-    next(e)
-  }
+  } catch (e) { next(e) }
 }
 
 async function userHistory(req, res, next) {
@@ -272,26 +256,12 @@ async function userHistory(req, res, next) {
     const items = await Drop.find({ uploaderId: req.user.id }).sort({ createdAt: -1 }).limit(200)
     res.json(
       items.map((d) => ({
-        id: d._id,
-        messagePreview: (d.message || "").slice(0, 120),
-        filename: d.filename,
-        mimeType: d.mimeType,
-        createdAt: d.createdAt,
-        expiresAt: d.expiresAt,
-        isDeleted: d.isDeleted,
-        downloadsCount: d.downloadsCount,
-        maxDownloads: d.maxDownloads,
+        id: d._id, messagePreview: (d.message || "").slice(0, 120), filename: d.filename,
+        mimeType: d.mimeType, createdAt: d.createdAt, expiresAt: d.expiresAt,
+        isDeleted: d.isDeleted, downloadsCount: d.downloadsCount, maxDownloads: d.maxDownloads,
       })),
     )
-  } catch (e) {
-    next(e)
-  }
+  } catch (e) { next(e) }
 }
 
-module.exports = {
-  createDrop,
-  viewDrop,
-  downloadDrop,
-  deleteDrop,
-  userHistory,
-}
+module.exports = { createDrop, viewDrop, downloadDrop, deleteDrop, userHistory }
