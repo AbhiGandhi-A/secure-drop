@@ -2,7 +2,7 @@
 
 import { useAuth } from "../context/AuthContext.jsx"
 import api from "../api/client.js"
-import { notify } from "./Notifications.jsx" // Assumed path
+import { notify } from "..components/Notifications.jsx" // Assumed path
 
 // Feature list data based on your requirements
 const PLAN_FEATURES = {
