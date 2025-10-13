@@ -9,26 +9,26 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
+      // Reads 'user' key
       const cached = localStorage.getItem("user")
       return cached ? JSON.parse(cached) : null
     } catch {
       return null
     }
   })
-  // 🚨 Corrected: Reads the 'token' key
+  // Reads 'token' key
   const [token, setToken] = useState(localStorage.getItem("token") || null)
   const [loginAt, setLoginAt] = useState(Number(localStorage.getItem("loginAt") || 0))
 
   useEffect(() => {
-    // This ensures the API utility's header is always in sync with state
+    // 🚨 This call sets the header on the Axios instance
     setAuthToken(token) 
     if (!token) setUser(null)
 
     let timer
     if (token && loginAt) {
       const elapsed = Date.now() - loginAt
-      // 60 minutes * 60 seconds * 1000 ms
-      const remaining = Math.max(0, 60 * 60 * 1000 - elapsed) 
+      const remaining = Math.max(0, 60 * 60 * 1000 - elapsed)
       timer = setTimeout(() => {
         logout()
       }, remaining)
@@ -44,13 +44,22 @@ export function AuthProvider({ children }) {
   }, [user])
 
   const login = async (email, password) => {
-    const { data } = await api.post("/api/auth/login", { email, password })
-    localStorage.setItem("token", data.token)
-    localStorage.setItem("loginAt", String(Date.now()))
-    localStorage.setItem("user", JSON.stringify(data.user))
-    setToken(data.token)
-    setLoginAt(Date.now())
-    setUser(data.user)
+    try {
+      // 🚨 This is the correct API call
+      const { data } = await api.post("/api/auth/login", { email, password })
+      
+      localStorage.setItem("token", data.token)
+      localStorage.setItem("loginAt", String(Date.now()))
+      localStorage.setItem("user", JSON.stringify(data.user))
+      setToken(data.token)
+      setLoginAt(Date.now())
+      setUser(data.user)
+      
+      return data; // Return data for external handling (like in the Login component)
+    } catch (error) {
+      // Re-throw error so the Login component can catch it and display a notification
+      throw error; 
+    }
   }
 
   const register = async (name, email, password) => {

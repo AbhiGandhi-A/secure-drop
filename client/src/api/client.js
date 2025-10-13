@@ -1,7 +1,6 @@
-import axios from "axios"
+import axios from "axios";
 
-// 🚨 Corrected: Use the same key 'token' that AuthProvider uses.
-// Also, define the baseURL with the environment variable.
+// 🚨 ACTION REQUIRED: Verify VITE_API_BASE_URL is set to your Render URL.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 const api = axios.create({
@@ -9,16 +8,20 @@ const api = axios.create({
   withCredentials: false,
 });
 
-// Function to set the Authorization header on the API instance
+/**
+ * Sets the Authorization header for all subsequent API calls.
+ * This is called by AuthProvider whenever the token state changes.
+ */
 export function setAuthToken(token) {
   if (token) {
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   } else {
-    delete api.defaults.headers.common["Authorization"]
+    delete api.defaults.headers.common["Authorization"];
   }
 }
 
 // 🚨 Initial Load Check: Apply token from localStorage on file load
+// This ensures that even before AuthProvider runs, the token is available if a request is made.
 try {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   if (token) {
