@@ -58,7 +58,7 @@ export default function Profile() {
               plan,
             })
 
-            // 💡 FIX: Use the updated user object returned from the server (confirmData.user)
+            // Use the updated user object returned from the server
             if (confirmData.ok && confirmData.user) {
               setUser(confirmData.user) 
               notify("Subscription activated!", "success")

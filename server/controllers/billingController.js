@@ -12,7 +12,7 @@ try {
   console.warn("[billing] Razorpay init failed:", e.message)
 }
 
-// Create order
+// Create order (omitted for brevity, remains unchanged)
 async function createOrder(req, res) {
   try {
     if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
@@ -48,6 +48,10 @@ async function confirmPayment(req, res) {
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing payment fields" })
     }
+    
+    // 🚨 DEBUG TIP: Console log the secret key and the combined value for debugging signature failure
+    // console.log("Secret:", razorEnv.keySecret);
+    // console.log("Combined Value:", `${razorpay_order_id}|${razorpay_payment_id}`);
 
     const expected = crypto
       .createHmac("sha256", razorEnv.keySecret)
@@ -55,6 +59,8 @@ async function confirmPayment(req, res) {
       .digest("hex")
 
     if (expected !== razorpay_signature) {
+      // 🚨 THIS IS THE LIKELY SOURCE OF YOUR 400 ERROR
+      console.error("[billing] Signature Mismatch: Expected", expected, "Got", razorpay_signature);
       return res.status(400).json({ error: "Signature verification failed" })
     }
 
@@ -70,12 +76,11 @@ async function confirmPayment(req, res) {
         } 
       )
 
-      // 💡 RESPONSE: Return the updated user object with the 'plan' field set to subscriptionPlan
       const responseUser = {
         id: updatedUser._id.toString(),
         name: updatedUser.name,
         email: updatedUser.email,
-        plan: updatedUser.subscriptionPlan, // Correctly set to "PREMIUM_MONTHLY" or "PREMIUM_YEARLY"
+        plan: updatedUser.subscriptionPlan, 
       }
       return res.json({ ok: true, user: responseUser })
     }
