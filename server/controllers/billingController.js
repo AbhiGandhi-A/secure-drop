@@ -6,16 +6,17 @@ let razorpay = null
 
 // 🚨 LOGGING AT SERVER STARTUP 🚨
 if (!razorEnv.keyId || !razorEnv.keySecret) {
-    console.error("[billing] FATAL: Razorpay environment variables (keyId/keySecret) are MISSING. Check ../config/env.")
+    console.error("[billing] FATAL: Razorpay environment variables (keyId/keySecret) are MISSING. Check ../config/env.")
 } else {
-    console.log(`[billing] Razorpay Key ID loaded (ID starts with: ${razorEnv.keyId.substring(0, 4)}...).`)
+    console.log(`[billing] Razorpay Key ID loaded (ID starts with: ${razorEnv.keyId.substring(0, 4)}...).`)
 }
 
 try {
   if (razorEnv.keyId && razorEnv.keySecret) {
+    // Ensure 'razorpay' package is installed on the server
     const Razorpay = require("razorpay")
     razorpay = new Razorpay({ key_id: razorEnv.keyId, key_secret: razorEnv.keySecret })
-    console.log("[billing] Razorpay instance initialized successfully.")
+    console.log("[billing] Razorpay instance initialized successfully.")
   }
 } catch (e) {
   console.warn("[billing] Razorpay init failed during construction:", e.message)
@@ -24,30 +25,32 @@ try {
 
 // Create order
 async function createOrder(req, res) {
+    // 1. AUTHENTICATION CHECK (Requires 'authenticate' middleware on the route)
     if (!req.user?.id) {
         return res.status(401).json({ error: "Authentication required" })
     }
     
     try {
+      // 2. CONFIGURATION CHECK (Checks if Razorpay was initialized)
       if (!razorpay) {
-            console.error("[billing] createOrder failed: Razorpay instance is NULL (Keys likely missing or Razorpay library failed to load).")
-            // 🚨 This sends the 'Billing not configured' message
+            console.error("[billing] createOrder failed: Razorpay instance is NULL (Keys likely missing or Razorpay library failed to load).")
             return res.status(501).json({ error: "Billing not configured" })
-        }
+        }
 
       const { plan = "monthly" } = req.body
       const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
 
+      // 3. PRICE CHECK (Checks if prices are configured)
       if (!amount || amount <= 0) {
-            console.error(`[billing] createOrder failed: Price is invalid. plan=${plan}, amount=${amount}. Check razorEnv.priceMonthly/priceYearly.`)
-            // 🚨 This would send a 'Price not configured' message
+            console.error(`[billing] createOrder failed: Price is invalid. plan=${plan}, amount=${amount}. Check razorEnv.priceMonthly/priceYearly.`)
             return res.status(400).json({ error: "Price not configured" })
-        }
+        }
 
       // Log the amount being used for the order
       console.log(`[billing] Creating order for user ${req.user.id} (Plan: ${plan}, Amount: ${amount})`)
 
 
+      // 4. RAZORPAY API CALL
       const order = await razorpay.orders.create({
         amount, // in paise
         currency: "INR",
@@ -64,7 +67,6 @@ async function createOrder(req, res) {
       })
     } catch (e) {
       console.error("[billing] createOrder error (Razorpay API call failed):", e.message, e)
-      // 🚨 This sends the 'Failed to create order' message
       return res.status(500).json({ error: "Failed to create order" })
     }
 }
@@ -134,4 +136,5 @@ async function confirmPayment(req, res) {
     }
 }
 
+// 🚨 THIS IS THE CRITICAL EXPORT LINE
 module.exports = { createOrder, confirmPayment }
