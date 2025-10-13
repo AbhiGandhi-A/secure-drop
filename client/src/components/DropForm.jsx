@@ -32,15 +32,31 @@ export default function DropForm() {
     return "3" // ANON
   }, [plan])
 
+  // Plan-based numeric cap for max downloads (Yearly is unlimited)
+  const maxDownloadsLimit = useMemo(() => {
+    if (plan === "PREMIUM_YEARLY") return Number.POSITIVE_INFINITY
+    if (plan === "PREMIUM_MONTHLY") return 20
+    if (plan === "FREE") return 5
+    return 3 // ANON
+  }, [plan])
+
   const onSubmit = async (e) => {
     e.preventDefault()
     const fd = new FormData()
     fd.append("message", message)
     fd.append("expiresInHours", Math.min(expiresInHours, maxByPlan))
+    // Clamp submitted maxDownloads to the plan limit (non-yearly)
     if (oneTime) {
       fd.append("maxDownloads", 1)
     } else if (plan !== "PREMIUM_YEARLY") {
-      fd.append("maxDownloads", maxDownloads)
+      const allowed = Math.max(
+        1,
+        Math.min(
+          Number(maxDownloads || 1),
+          Number.isFinite(maxDownloadsLimit) ? maxDownloadsLimit : Number.MAX_SAFE_INTEGER,
+        ),
+      )
+      fd.append("maxDownloads", allowed)
     }
     fd.append("oneTime", oneTime ? "true" : "false")
     if (file) fd.append("file", file)
@@ -111,10 +127,28 @@ export default function DropForm() {
                 <input
                   type="number"
                   min="1"
-                  max="100"
+                  // Enforce plan-based maximum in the UI
+                  max={Number.isFinite(maxDownloadsLimit) ? maxDownloadsLimit : undefined}
                   disabled={oneTime}
-                  value={oneTime ? 1 : maxDownloads}
-                  onChange={(e) => setMax(Number(e.target.value || 1))}
+                  value={
+                    oneTime
+                      ? 1
+                      : Math.max(
+                          1,
+                          Math.min(
+                            Number(maxDownloads || 1),
+                            Number.isFinite(maxDownloadsLimit) ? maxDownloadsLimit : Number(maxDownloads || 1),
+                          ),
+                        )
+                  }
+                  onChange={(e) => {
+                    const val = Number(e.target.value || 1)
+                    const capped = Math.max(
+                      1,
+                      Math.min(val, Number.isFinite(maxDownloadsLimit) ? maxDownloadsLimit : val),
+                    )
+                    setMax(capped)
+                  }}
                 />
                 <div className="muted">Up to {maxDownloadsHint}</div>
               </>
