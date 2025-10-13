@@ -26,10 +26,17 @@ async function createOrder(req, res) {
     const amount = plan === "yearly" ? razorEnv.priceYearly : razorEnv.priceMonthly
     if (!amount || amount <= 0) return res.status(400).json({ error: "Price not configured" })
 
+    // Ensure Razorpay receipt length <= 40 to avoid BAD_REQUEST_ERROR
+    const shortUser = String(req.user.id || "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(-10) // last 10 safe chars
+    const shortTs = Date.now().toString().slice(-10) // last 10 digits of timestamp
+    const receipt = `sub_${shortUser}_${shortTs}`.slice(0, 40)
+
     const order = await razorpay.orders.create({
       amount, // in paise
       currency: "INR",
-      receipt: `sub_${req.user.id}_${Date.now()}`,
+      receipt,
       notes: { plan, userId: req.user.id },
     })
 

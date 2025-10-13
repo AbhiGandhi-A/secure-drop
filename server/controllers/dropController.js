@@ -66,8 +66,17 @@ async function createDrop(req, res, next) {
     const oneTimeBool = typeof oneTime === "string" ? oneTime.toLowerCase() === "true" : !!oneTime
 
     // Clamp downloads: cannot exceed plan's maximum or 100 for safety
-    const requestedDownloads = Number.parseInt(maxDownloads, 10) || defaultMaxDownloads
-    const maxDownloadsNum = Math.min(requestedDownloads, defaultMaxDownloads, 100)
+    const requestedDownloads = Number.parseInt(maxDownloads, 10)
+    let maxDownloadsNum
+    if (oneTimeBool) {
+      maxDownloadsNum = 1
+    } else if (plan === "PREMIUM_YEARLY") {
+      // Always use plan default to keep it effectively "unlimited"
+      maxDownloadsNum = defaultMaxDownloads
+    } else {
+      const safeRequested = Number.isFinite(requestedDownloads) ? requestedDownloads : defaultMaxDownloads
+      maxDownloadsNum = Math.min(safeRequested, defaultMaxDownloads)
+    }
 
     // File validations
     let filename = ""
@@ -110,7 +119,7 @@ async function createDrop(req, res, next) {
       filePath,
 
       // If oneTime, override downloads to 1
-      maxDownloads: oneTimeBool ? 1 : maxDownloadsNum,
+      maxDownloads: maxDownloadsNum,
       downloadsCount: 0,
       oneTime: oneTimeBool,
 

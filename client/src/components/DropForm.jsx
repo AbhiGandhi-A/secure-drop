@@ -37,7 +37,11 @@ export default function DropForm() {
     const fd = new FormData()
     fd.append("message", message)
     fd.append("expiresInHours", Math.min(expiresInHours, maxByPlan))
-    fd.append("maxDownloads", oneTime ? 1 : maxDownloads)
+    if (oneTime) {
+      fd.append("maxDownloads", 1)
+    } else if (plan !== "PREMIUM_YEARLY") {
+      fd.append("maxDownloads", maxDownloads)
+    }
     fd.append("oneTime", oneTime ? "true" : "false")
     if (file) fd.append("file", file)
 
@@ -102,7 +106,7 @@ export default function DropForm() {
               type="number"
               min="1"
               max="100"
-              disabled={oneTime || plan === "PREMIUM_YEARLY"} // unlimited on yearly
+              disabled={oneTime || plan === "PREMIUM_YEARLY"}
               value={oneTime ? 1 : maxDownloads}
               onChange={(e) => setMax(Number(e.target.value || 1))}
             />
