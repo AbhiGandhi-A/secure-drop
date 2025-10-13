@@ -4,25 +4,30 @@
     <loc>https://secure-drop-phi.vercel.app/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <lastmod>2025-10-14</lastmod>
   </url>
   <url>
     <loc>https://secure-drop-phi.vercel.app/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+    <lastmod>2025-10-14</lastmod>
   </url>
   <url>
     <loc>https://secure-drop-phi.vercel.app/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+    <lastmod>2025-10-14</lastmod>
   </url>
   <url>
     <loc>https://secure-drop-phi.vercel.app/dashboard</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <lastmod>2025-10-14</lastmod>
   </url>
   <url>
     <loc>https://secure-drop-phi.vercel.app/profile</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
+    <lastmod>2025-10-14</lastmod>
   </url>
 </urlset>
