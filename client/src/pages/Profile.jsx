@@ -2,14 +2,14 @@
 
 import { useAuth } from "../context/AuthContext.jsx"
 import api from "../api/client.js"
-import { notify } from "..components/Notifications.jsx" // Assumed path
+import { notify } from "../components/Notifications.jsx" // ✅ CORRECTED PATH
 
 // Feature list data based on your requirements
 const PLAN_FEATURES = {
   FREE: { expiry: "24 hours", downloads: "5 max", detail: "Standard limits" },
   PREMIUM_MONTHLY: { expiry: "1 week", downloads: "20 max", detail: "Priority service" },
   PREMIUM_YEARLY: { expiry: "2 weeks", downloads: "Unlimited", detail: "Full access and best value" },
-  ANON: { expiry: "6 hours", downloads: "3 max", detail: "For guests only" } // Used for non-logged-in users, though not directly shown here
+  ANON: { expiry: "6 hours", downloads: "3 max", detail: "For guests only" } 
 }
 
 function loadRazorpay() {
@@ -32,7 +32,6 @@ function formatPlan(plan) {
 export default function Profile() {
   const { user, setUser } = useAuth()
   
-  // Determine features based on user's plan, defaulting to FREE if plan is missing
   const currentPlan = user?.plan || "FREE"
   const features = PLAN_FEATURES[currentPlan] || PLAN_FEATURES.FREE
 
@@ -44,7 +43,6 @@ export default function Profile() {
         return
       }
 
-      // The API call now has the authentication token attached by client.js/AuthContext
       const { data } = await api.post("/api/billing/create-order", { plan })
       const { keyId, orderId, amount, currency } = data || {}
 
@@ -71,9 +69,7 @@ export default function Profile() {
               plan,
             })
 
-            // CRITICAL: Use the updated user object returned from the server
             if (confirmData.ok && confirmData.user) {
-              // Update local state with the new plan
               setUser(confirmData.user) 
               notify("Subscription activated!", "success")
             } else {
@@ -95,7 +91,6 @@ export default function Profile() {
       const rzp = new window.Razorpay(options)
       rzp.open()
     } catch (e) {
-      // This catches the 401/500/etc. from create-order
       console.error("Create order failed:", e)
       notify(e?.response?.data?.error || "Failed to create order", "error")
     }
