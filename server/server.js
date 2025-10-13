@@ -38,25 +38,6 @@ app.use("/api/files", require("./routes/files")) // mount files routes for saved
 app.use(notFound)
 app.use(errorHandler)
 
-app.get("/sitemap.xml", (req, res) => {
-  res.header("Content-Type", "application/xml");
-
-  const baseUrl = "https://secure-drop-phi.vercel.app";
-  const pages = [
-    { loc: `${baseUrl}/`, priority: 1.0 },
-    { loc: `${baseUrl}/about`, priority: 0.8 },
-    { loc: `${baseUrl}/contact`, priority: 0.8 },
-  ];
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  ${pages.map(p => `<url><loc>${p.loc}</loc><priority>${p.priority}</priority></url>`).join('')}
-</urlset>`;
-
-  res.send(xml);
-});
-
-
 connectDB()
   .then(() => {
     startExpiryWorker()
