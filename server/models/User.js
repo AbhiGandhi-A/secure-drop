@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     subscriptionPlan: {
       type: String,
-      // 🚨 UPDATED ENUM VALUES for consistency
+      // Ensure these match the values in your PLAN_LIMITS and PLAN_MAP
       enum: ["FREE", "PREMIUM_MONTHLY", "PREMIUM_YEARLY"], 
       default: "FREE",
     },

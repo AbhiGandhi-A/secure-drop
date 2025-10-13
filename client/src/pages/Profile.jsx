@@ -2,7 +2,15 @@
 
 import { useAuth } from "../context/AuthContext.jsx"
 import api from "../api/client.js"
-import { notify } from "../components/Notifications.jsx"
+import { notify } from "./Notifications.jsx" // Assumed path
+
+// Feature list data based on your requirements
+const PLAN_FEATURES = {
+  FREE: { expiry: "24 hours", downloads: "5 max", detail: "Standard limits" },
+  PREMIUM_MONTHLY: { expiry: "1 week", downloads: "20 max", detail: "Priority service" },
+  PREMIUM_YEARLY: { expiry: "2 weeks", downloads: "Unlimited", detail: "Full access and best value" },
+  ANON: { expiry: "6 hours", downloads: "3 max", detail: "For guests only" } // Used for non-logged-in users, though not directly shown here
+}
 
 function loadRazorpay() {
   return new Promise((resolve) => {
@@ -23,6 +31,10 @@ function formatPlan(plan) {
 
 export default function Profile() {
   const { user, setUser } = useAuth()
+  
+  // Determine features based on user's plan, defaulting to FREE if plan is missing
+  const currentPlan = user?.plan || "FREE"
+  const features = PLAN_FEATURES[currentPlan] || PLAN_FEATURES.FREE
 
   const subscribe = async (plan) => {
     try {
@@ -32,11 +44,12 @@ export default function Profile() {
         return
       }
 
+      // The API call now has the authentication token attached by client.js/AuthContext
       const { data } = await api.post("/api/billing/create-order", { plan })
       const { keyId, orderId, amount, currency } = data || {}
 
       if (!keyId || !orderId) {
-        notify("Billing not configured", "error")
+        notify("Billing not configured (Server missing keys or prices)", "error")
         return
       }
 
@@ -58,8 +71,9 @@ export default function Profile() {
               plan,
             })
 
-            // Use the updated user object returned from the server
+            // CRITICAL: Use the updated user object returned from the server
             if (confirmData.ok && confirmData.user) {
+              // Update local state with the new plan
               setUser(confirmData.user) 
               notify("Subscription activated!", "success")
             } else {
@@ -81,7 +95,9 @@ export default function Profile() {
       const rzp = new window.Razorpay(options)
       rzp.open()
     } catch (e) {
-      notify("Failed to create order or billing not configured", "error")
+      // This catches the 401/500/etc. from create-order
+      console.error("Create order failed:", e)
+      notify(e?.response?.data?.error || "Failed to create order", "error")
     }
   }
 
@@ -96,21 +112,29 @@ export default function Profile() {
       <div>
         <strong>Email:</strong> {user.email}
       </div>
-      <div>
-        <strong>Plan:</strong> {formatPlan(user.plan)}
+      
+      <hr/>
+      
+      <h3>Your Plan: {formatPlan(currentPlan)}</h3>
+      <div className="plan-features">
+        <div><strong>Max Expiry:</strong> {features.expiry}</div>
+        <div><strong>Max Downloads:</strong> {features.downloads}</div>
+        <div className="muted">{features.detail}</div>
       </div>
 
       <h3>Upgrade</h3>
       <div className="row">
-        <button className="btn-primary" onClick={() => subscribe("monthly")}>
+        <button className="btn-primary" 
+          onClick={() => subscribe("monthly")}
+          disabled={currentPlan === "PREMIUM_MONTHLY" || currentPlan === "PREMIUM_YEARLY"}>
           Go Premium (Monthly)
         </button>
-        <button className="btn-outline" onClick={() => subscribe("yearly")}>
+        <button className="btn-outline" 
+          onClick={() => subscribe("yearly")}
+          disabled={currentPlan === "PREMIUM_YEARLY"}>
           Go Premium (Yearly)
         </button>
       </div>
-
-      <div className="muted">Premium: larger files, longer expiry, no ads.</div>
     </div>
   )
 }
