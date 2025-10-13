@@ -3,8 +3,7 @@ const multer = require("multer")
 const path = require("path")
 const { authRequired } = require("../middleware/auth")
 const { createDropRules, pinRule } = require("../middleware/validators")
-// 💡 FIX: Import the whole controller module object to resolve the circular dependency issue.
-// Destructuring here causes functions like deleteDrop to load as undefined.
+// FIX: Change destructuring to import the full object to resolve circular dependency
 const dropController = require("../controllers/dropController")
 const { limiterDrops } = require("../middleware/rateLimit")
 const { uploadDir } = require("../config/env")
@@ -17,11 +16,11 @@ const upload = multer({
   limits: { fileSize: 1024 * 1024 * 1024 }, // actual validation per-plan in controller
 })
 
-// Access controller functions using the imported object: dropController.functionName
+// Use the imported object's properties
 router.post("/create", limiterDrops, upload.single("file"), createDropRules, dropController.createDrop)
 router.post("/view", limiterDrops, [pinRule], dropController.viewDrop)
 router.get("/download", limiterDrops, dropController.downloadDrop)
-// Using the imported object property ensures the function loads correctly, resolving the Error: [object Undefined]
+// Line 25: Now correctly references dropController.deleteDrop
 router.delete("/:id", limiterDrops, authRequired, dropController.deleteDrop)
 
 module.exports = router
