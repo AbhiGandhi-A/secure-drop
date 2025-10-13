@@ -102,15 +102,23 @@ export default function DropForm() {
 
           <div>
             <label>Max downloads</label>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              disabled={oneTime || plan === "PREMIUM_YEARLY"}
-              value={oneTime ? 1 : maxDownloads}
-              onChange={(e) => setMax(Number(e.target.value || 1))}
-            />
-            <div className="muted">{plan === "PREMIUM_YEARLY" ? "Unlimited" : `Up to ${maxDownloadsHint}`}</div>
+            {plan === "PREMIUM_YEARLY" ? (
+              <div className="muted">
+                <strong>Unlimited</strong>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  disabled={oneTime}
+                  value={oneTime ? 1 : maxDownloads}
+                  onChange={(e) => setMax(Number(e.target.value || 1))}
+                />
+                <div className="muted">Up to {maxDownloadsHint}</div>
+              </>
+            )}
           </div>
         </div>
 

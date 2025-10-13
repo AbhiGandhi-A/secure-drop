@@ -2,7 +2,7 @@ const router = require("express").Router()
 const multer = require("multer")
 const path = require("path")
 
-const { authenticate } = require("../middleware/auth")
+const { authenticate, attachUserIfPresent } = require("../middleware/auth")
 const { createDropRules, pinRule } = require("../middleware/validators")
 
 // Import controller object to avoid circular deps
@@ -18,7 +18,15 @@ const upload = multer({
   limits: { fileSize: 1024 * 1024 * 1024 }, // actual per-plan validation inside controller
 })
 
-router.post("/create", limiterDrops, upload.single("file"), createDropRules, dropController.createDrop)
+router.post(
+  "/create",
+  limiterDrops,
+  attachUserIfPresent,
+  upload.single("file"),
+  createDropRules,
+  dropController.createDrop,
+)
+
 router.post("/view", limiterDrops, [pinRule], dropController.viewDrop)
 router.get("/download", limiterDrops, dropController.downloadDrop)
 

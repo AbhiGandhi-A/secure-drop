@@ -21,7 +21,22 @@ function authenticate(req, res, next) {
   }
 }
 
+function attachUserIfPresent(req, res, next) {
+  try {
+    const header = req.headers.authorization || ""
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null
+    if (!token) return next()
+    const payload = jwt.verify(token, jwtSecret)
+    req.user = { id: payload.sub, plan: payload.plan || "FREE" }
+    return next()
+  } catch (e) {
+    // token invalid -> proceed as guest
+    return next()
+  }
+}
+
 module.exports = {
   authenticate,
-  authRequired: authenticate, // alias
+  authRequired: authenticate,
+  attachUserIfPresent,
 }
