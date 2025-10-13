@@ -14,11 +14,11 @@ try {
 
 // Create order
 async function createOrder(req, res) {
-    // 🚨 Ensure the user is authenticated early (requires authenticate middleware on route)
-    if (!req.user?.id) {
-        return res.status(401).json({ error: "Authentication required" })
-    }
-    
+    // 🚨 Ensure the user is authenticated early
+    if (!req.user?.id) {
+        return res.status(401).json({ error: "Authentication required" })
+    }
+    
     try {
       if (!razorpay) return res.status(501).json({ error: "Billing not configured" })
 
@@ -29,8 +29,8 @@ async function createOrder(req, res) {
       const order = await razorpay.orders.create({
         amount, // in paise
         currency: "INR",
-        receipt: `sub_${req.user.id}_${Date.now()}`, // Use req.user.id directly now
-        notes: { plan, userId: req.user.id }, // Best practice: explicitly pass userId
+        receipt: `sub_${req.user.id}_${Date.now()}`,
+        notes: { plan, userId: req.user.id },
       })
 
       return res.json({
@@ -48,18 +48,17 @@ async function createOrder(req, res) {
 
 // Confirm payment
 async function confirmPayment(req, res) {
-    // 🚨 Ensure the user is authenticated early (requires authenticate middleware on route)
-    if (!req.user?.id) {
-        return res.status(401).json({ error: "Authentication required" }) // Better status code than 400
-    }
-    
+    // 🚨 Ensure the user is authenticated early
+    if (!req.user?.id) {
+        return res.status(401).json({ error: "Authentication required" }) 
+    }
+    
     try {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan = "monthly" } = req.body
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return res.status(400).json({ error: "Missing payment fields" })
       }
     
-      // 🚨 DEBUG LOGGING FOR SIGNATURE FAILURE 🚨 (Confirmed OK by previous logs)
       console.log("--- Razorpay Signature Check Debug Info ---");
       console.log(`1. Secret Key used by server: ${razorEnv.keySecret ? 'Loaded' : 'NOT FOUND'}`);
       console.log(`2. Signature input string: ${razorpay_order_id}|${razorpay_payment_id}`);
@@ -78,7 +77,6 @@ async function confirmPayment(req, res) {
         return res.status(400).json({ error: "Signature verification failed" })
       }
     
-      // Log success before updating DB
       console.log("[billing] Signature verified successfully. Updating user plan.");
 
 
@@ -86,18 +84,18 @@ async function confirmPayment(req, res) {
       const newPlan = plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY" 
 
       const updatedUser = await User.findByIdAndUpdate(
-        req.user.id, // ID is guaranteed here by the check at the function start
+        req.user.id,
         { subscriptionPlan: newPlan }, 
         { 
           new: true, 
           select: "name email subscriptionPlan _id" 
         } 
       )
-      
-      if (!updatedUser) {
-          console.error(`[billing] User ID ${req.user.id} not found for update.`);
-          return res.status(404).json({ error: "User profile not found in database." });
-      }
+      
+      if (!updatedUser) {
+          console.error(`[billing] User ID ${req.user.id} not found for update.`);
+          return res.status(404).json({ error: "User profile not found in database." });
+      }
 
       const responseUser = {
         id: updatedUser._id.toString(),
