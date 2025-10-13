@@ -6,13 +6,15 @@ const mime = require("mime-types")
 const Drop = require("../models/Drop")
 const { generateHashedPIN, maskPIN } = require("../utils/pin")
 const { compareValue } = require("../utils/hash")
-const { allowedMimeTypes } = require("../config/constants")
+const { allowedMimeTypes } = require("../config/constants") // NOTE: This constant is now unused
 const { limits, expiry, jwtSecret, uploadDir } = require("../config/env")
 const storage = require("../utils/storage")
 const { scanFile } = require("../services/virusScan")
 
 function planFromReq(req) {
   if (!req.user) return "ANON"
+  // Assuming subscription plan names from previous context: PREMIUM_MONTHLY/YEARLY should map to "PREMIUM"
+  if (req.user.plan.startsWith("PREMIUM")) return "PREMIUM" 
   return req.user.plan || "FREE"
 }
 
@@ -54,12 +56,12 @@ async function createDrop(req, res, next) {
         fs.unlinkSync(req.file.path)
         return res.status(400).json({ error: "File too large for your plan" })
       }
+      
       mimeType = mime.lookup(req.file.originalname) || req.file.mimetype || "application/octet-stream"
-      if (!allowedMimeTypes.includes(mimeType)) {
-        fs.unlinkSync(req.file.path)
-        return res.status(400).json({ error: "Unsupported file type" })
-      }
-
+      
+      // 🚨 FIX APPLIED: REMOVED the check against allowedMimeTypes, 
+      // allowing any file type to pass through.
+      
       // Virus scan (optional)
       const scan = await scanFile(req.file.path)
       if (!scan.clean) {
