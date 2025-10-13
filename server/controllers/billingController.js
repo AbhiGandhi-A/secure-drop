@@ -49,20 +49,29 @@ async function confirmPayment(req, res) {
       return res.status(400).json({ error: "Missing payment fields" })
     }
     
-    // 🚨 DEBUG TIP: Console log the secret key and the combined value for debugging signature failure
-    // console.log("Secret:", razorEnv.keySecret);
-    // console.log("Combined Value:", `${razorpay_order_id}|${razorpay_payment_id}`);
+    // 🚨 DEBUG LOGGING FOR SIGNATURE FAILURE 🚨
+    console.log("--- Razorpay Signature Check Debug Info ---");
+    console.log(`1. Secret Key used by server: ${razorEnv.keySecret ? 'Loaded' : 'NOT FOUND'}`);
+    console.log(`2. Signature input string: ${razorpay_order_id}|${razorpay_payment_id}`);
+    console.log(`3. Signature received from client: ${razorpay_signature}`);
+    console.log("-------------------------------------------");
 
+
+    // Concatenate the order ID and payment ID
     const expected = crypto
       .createHmac("sha256", razorEnv.keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex")
 
     if (expected !== razorpay_signature) {
-      // 🚨 THIS IS THE LIKELY SOURCE OF YOUR 400 ERROR
+      // THIS IS THE LIKELY SOURCE OF YOUR 400 ERROR
       console.error("[billing] Signature Mismatch: Expected", expected, "Got", razorpay_signature);
       return res.status(400).json({ error: "Signature verification failed" })
     }
+    
+    // Log success before updating DB
+    console.log("[billing] Signature verified successfully. Updating user plan.");
+
 
     if (req.user?.id) {
       const newPlan = plan === "yearly" ? "PREMIUM_YEARLY" : "PREMIUM_MONTHLY" 
@@ -87,7 +96,7 @@ async function confirmPayment(req, res) {
 
     return res.status(400).json({ error: "User not found" })
   } catch (e) {
-    console.error("[billing] confirmPayment error:", e)
+    console.error("[billing] confirmPayment error (Internal Server Error):", e)
     return res.status(500).json({ error: "Payment verification failed" })
   }
 }
