@@ -30,4 +30,36 @@
     <priority>0.6</priority>
     <lastmod>2025-10-14</lastmod>
   </url>
+
+   content pages for AdSense quality 
+  <url>
+    <loc>https://secure-drop-phi.vercel.app/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <lastmod>2025-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://secure-drop-phi.vercel.app/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+    <lastmod>2025-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://secure-drop-phi.vercel.app/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+    <lastmod>2025-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://secure-drop-phi.vercel.app/faq</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+    <lastmod>2025-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://secure-drop-phi.vercel.app/contact</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <lastmod>2025-10-14</lastmod>
+  </url>
 </urlset>
