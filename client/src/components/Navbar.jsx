@@ -1,12 +1,11 @@
 "use client"
 import { Link, useLocation } from "react-router-dom"
-import { useAuth } from "../hooks/useAuth" // Assuming useAuth is a custom hook that provides user information
+import { useAuth } from "../context/AuthContext.jsx"
 
 const Navbar = () => {
   const location = useLocation()
-  const { user } = useAuth() // Declare the user variable using the useAuth hook
-
-  return (
+  const { user } = useAuth() 
+ return (
     <nav className="navbar">
       <div className="nav-logo">
         <Link to="/">Logo</Link>
